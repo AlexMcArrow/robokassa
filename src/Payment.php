@@ -36,6 +36,7 @@ class Payment {
     private $login;
     private $paymentPassword;
     private $validationPassword;
+    private $crypter;
 
     /**
      * Class constructor.
@@ -44,13 +45,15 @@ class Payment {
      * @param  string $paymentPassword    password #1
      * @param  string $validationPassword password #2
      * @param  bool   $testMode           use test server
+     * @param  string $crypt              crypt format [md5|sha1]
      */
-    public function __construct($login, $paymentPassword, $validationPassword, $testMode = false)
+    public function __construct($login, $paymentPassword, $validationPassword, $testMode = false, $crypt = 'md5')
     {
         $this->login              = $login;
         $this->paymentPassword    = $paymentPassword;
         $this->validationPassword = $validationPassword;
         $this->isTestMode         = $testMode;
+        $this->crypter            = $crypt;
 
         $this->data = [
             'MerchantLogin'  => $this->login,
@@ -102,7 +105,7 @@ class Payment {
             $signature .= ':' . http_build_query($this->customParams, null, ':');
         }
 
-        $this->data['SignatureValue'] = md5($signature);
+        $this->data['SignatureValue'] = $this->_crypt($signature);
 
         $data   = http_build_query($this->data, null, '&');
         $custom = http_build_query($this->customParams, null, '&');
@@ -134,6 +137,19 @@ class Payment {
         return $this->validate($data, 'payment');
     }
 
+    private function _crypt($string) {
+        switch ($this->crypter) {
+            case 'md5':
+            default:
+                return md5($string);
+                break;
+            
+            case 'sha1':
+                return sha1($string);
+                break;
+        }
+    }
+
     /**
      * Validates the Robokassa query.
      *
@@ -156,7 +172,7 @@ class Payment {
             $this->getCustomParamsString($this->data)
         ]);
 
-        $this->valid = (md5($signature) === strtolower($data['SignatureValue']));
+        $this->valid = ($this->_crypt($signature) === strtolower($data['SignatureValue']));
 
         return $this->valid;
     }
